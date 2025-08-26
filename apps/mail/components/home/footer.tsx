@@ -7,17 +7,17 @@ import { useRef } from 'react';
 const socialLinks = [
   {
     name: 'Twitter',
-    href: 'https://x.com/mail0dotcom',
+    href: 'https://x.com/adminimailapp',
     icon: Twitter,
   },
   {
     name: 'LinkedIn',
-    href: 'https://www.linkedin.com/company/mail0/',
+    href: 'https://www.linkedin.com/company/admini-tech/',
     icon: LinkedIn,
   },
   {
     name: 'Discord',
-    href: 'https://discord.gg/mail0',
+    href: 'https://discord.gg/adminimail',
     icon: Discord,
   },
 ];
@@ -62,7 +62,7 @@ export default function Footer() {
                 className="hidden flex-col items-center justify-start md:flex"
               >
                 <div className="justify-start text-center text-lg font-normal leading-7 text-white lg:text-2xl">
-                  Get started and see how 0.email helps you process your inbox in a fraction of the
+                  Get started and see how AdminiMail helps you process your inbox in a fraction of the
                   time.
                 </div>
               </motion.div>
@@ -129,7 +129,7 @@ export default function Footer() {
                 <a
                   target="_blank"
                   rel="noreferrer"
-                  href="https://trust.inc/zero"
+                  href="https://trust.inc/admini"
                   className="w-full"
                 >
                   <div className="justify-start self-stretch text-base font-normal leading-none text-white opacity-80 transition-opacity hover:opacity-100">
@@ -155,7 +155,7 @@ export default function Footer() {
                   rel="noreferrer"
                 >
                   <div className="justify-start self-stretch text-base leading-none text-white opacity-80 transition-opacity hover:opacity-100">
-                    Chat with Zero
+                    Chat with AdminiMail
                   </div>
                 </a>
                 <a
@@ -165,7 +165,7 @@ export default function Footer() {
                   rel="noreferrer"
                 >
                   <div className="justify-start self-stretch text-base leading-none text-white opacity-80 transition-opacity hover:opacity-100">
-                    Zero AI
+                    AdminiMail AI
                   </div>
                 </a>
                 <a
@@ -198,7 +198,7 @@ export default function Footer() {
                 <a
                   target="_blank"
                   rel="noreferrer"
-                  href="https://github.com/Mail-0/Zero"
+                  href="https://github.com/Admini-Tech/AdminiMail"
                   className="w-full"
                 >
                   <div className="justify-start self-stretch text-base font-normal leading-none text-white opacity-80 transition-opacity hover:opacity-100">
@@ -213,7 +213,7 @@ export default function Footer() {
         <div className="flex flex-col items-start justify-start gap-6 self-stretch">
           <div className="inline-flex items-center justify-between self-stretch">
             <div className="justify-start text-xs font-medium leading-tight text-white opacity-80 sm:text-sm">
-              © 2025 Zero Email Inc, All Rights Reserved
+              © 2025 Admini Tech Inc, All Rights Reserved
             </div>
             <div className="flex items-center justify-start gap-4">
               <Link
