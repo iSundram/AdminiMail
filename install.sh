@@ -21,6 +21,7 @@ ADMINI_VERSION="1.0.0"
 NODE_VERSION="20"
 POSTGRES_VERSION="15"
 ADMINI_NONINTERACTIVE="${ADMINI_NONINTERACTIVE:-1}"
+ADMINI_FORCE_OVERRIDE="${ADMINI_FORCE_OVERRIDE:-0}"
 
 # Default ports
 SMTP_PORT=25
@@ -280,7 +281,29 @@ install_adminimail() {
                 print_info "Cloning AdminiMail repository into empty directory."
                 sudo -u "$ADMINI_USER" git clone https://github.com/iSundram/AdminiMail.git "$ADMINI_HOME"
             else
-                print_warning "$ADMINI_HOME is not empty and not a git repo. Skipping clone."
+                if [[ "$ADMINI_NONINTERACTIVE" == "1" && "$ADMINI_FORCE_OVERRIDE" != "1" ]]; then
+                    print_warning "$ADMINI_HOME is not empty and not a git repo. Skipping clone. Set ADMINI_FORCE_OVERRIDE=1 to override in non-interactive mode."
+                else
+                    echo -n "Directory $ADMINI_HOME is not empty and not a git repo. Override with a fresh clone? (y/N): "
+                    if [[ "$ADMINI_NONINTERACTIVE" == "1" ]]; then
+                        REPLY_YN="${ADMINI_FORCE_OVERRIDE}"
+                    else
+                        read -r REPLY
+                        REPLY_YN="$REPLY"
+                    fi
+                    if [[ "$REPLY_YN" == "1" || "$REPLY_YN" =~ ^[Yy]$ ]]; then
+                        TS=$(date +%Y%m%d%H%M%S)
+                        BACKUP_DIR="${ADMINI_HOME}.bak-${TS}"
+                        print_info "Backing up existing directory to ${BACKUP_DIR}"
+                        mv "$ADMINI_HOME" "$BACKUP_DIR"
+                        mkdir -p "$ADMINI_HOME"
+                        chown -R "$ADMINI_USER:$ADMINI_USER" "$ADMINI_HOME"
+                        print_info "Cloning AdminiMail repository."
+                        sudo -u "$ADMINI_USER" git clone https://github.com/iSundram/AdminiMail.git "$ADMINI_HOME"
+                    else
+                        print_info "Keeping existing directory; continuing without clone."
+                    fi
+                fi
             fi
         fi
     fi
