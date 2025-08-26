@@ -114,13 +114,13 @@ install_dependencies() {
         apt-get install -y curl wget gnupg2 software-properties-common \
                           build-essential python3 python3-pip \
                           nginx certbot python3-certbot-nginx \
-                          fail2ban ufw logrotate
+                          fail2ban ufw logrotate git rsync ca-certificates
     elif command -v yum >/dev/null 2>&1; then
         yum update -y
         yum install -y curl wget gnupg2 \
                       gcc gcc-c++ make python3 python3-pip \
                       nginx certbot python3-certbot-nginx \
-                      fail2ban firewalld logrotate
+                      fail2ban firewalld logrotate git rsync ca-certificates
     else
         print_error "Unsupported package manager. Please install dependencies manually."
         exit 1
@@ -305,8 +305,8 @@ install_adminimail() {
                 publicKeyEncoding: { type: 'spki', format: 'pem' },
                 privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
             });
-            require('fs').writeFileSync(process.env.ADMINI_HOME + '/certs/dkim-private.pem', privateKey);
-            require('fs').writeFileSync(process.env.ADMINI_HOME + '/certs/dkim-public.pem', publicKey);
+            require('fs').writeFileSync('$ADMINI_HOME/certs/dkim-private.pem', privateKey);
+            require('fs').writeFileSync('$ADMINI_HOME/certs/dkim-public.pem', publicKey);
             console.log('DKIM keys generated');
         "
     else
