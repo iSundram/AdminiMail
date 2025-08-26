@@ -1,10 +1,10 @@
 #!/bin/bash
+set -Eeuo pipefail
+IFS=$'\n\t'
 
 # AdminiMail Installation Script
 # Self-hosted email platform with AI-powered features
 # Version: 1.0.0
-
-set -e
 
 # Colors for output
 RED='\033[0;31m'
@@ -20,6 +20,7 @@ ADMINI_SERVICE="adminimail"
 ADMINI_VERSION="1.0.0"
 NODE_VERSION="20"
 POSTGRES_VERSION="15"
+ADMINI_NONINTERACTIVE="${ADMINI_NONINTERACTIVE:-1}"
 
 # Default ports
 SMTP_PORT=25
@@ -90,10 +91,14 @@ check_system() {
     
     if [[ $MEMORY_GB -lt 2 ]]; then
         print_warning "Low memory detected: ${MEMORY_GB}GB. AdminiMail requires at least 2GB RAM"
-        read -p "Continue anyway? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            exit 1
+        if [[ "$ADMINI_NONINTERACTIVE" == "1" ]]; then
+            print_warning "Continuing due to non-interactive mode (set ADMINI_NONINTERACTIVE=0 to prompt)."
+        else
+            read -p "Continue anyway? (y/N): " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                exit 1
+            fi
         fi
     fi
     
@@ -125,13 +130,15 @@ install_dependencies() {
 install_nodejs() {
     print_step "Installing Node.js $NODE_VERSION"
     
-    # Install NodeSource repository
-    curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
-    
     if command -v apt-get >/dev/null 2>&1; then
+        curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
         apt-get install -y nodejs
     elif command -v yum >/dev/null 2>&1; then
+        curl -fsSL https://rpm.nodesource.com/setup_${NODE_VERSION}.x | bash -
         yum install -y nodejs
+    else
+        print_error "Unsupported package manager for Node.js installation"
+        exit 1
     fi
     
     # Install pnpm
@@ -146,21 +153,30 @@ install_postgresql() {
     print_step "Installing PostgreSQL $POSTGRES_VERSION"
     
     if command -v apt-get >/dev/null 2>&1; then
-        # Add PostgreSQL official repository
-        wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
-        echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
+        # Add PostgreSQL official repository using keyring (apt-key deprecated)
+        install -d -m 0755 /usr/share/keyrings
+        curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/postgresql.gpg
+        . /etc/os-release
+        CODENAME=${VERSION_CODENAME:-$(lsb_release -cs 2>/dev/null || echo "bookworm")}
+        echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt/ ${CODENAME}-pgdg main" > /etc/apt/sources.list.d/pgdg.list
         apt-get update
         apt-get install -y postgresql-${POSTGRES_VERSION} postgresql-contrib-${POSTGRES_VERSION}
+        POSTGRES_SERVICE="postgresql"
     elif command -v yum >/dev/null 2>&1; then
         yum install -y postgresql${POSTGRES_VERSION}-server postgresql${POSTGRES_VERSION}-contrib
-        postgresql-${POSTGRES_VERSION}-setup initdb
+        if command -v postgresql-${POSTGRES_VERSION}-setup >/dev/null 2>&1; then
+            postgresql-${POSTGRES_VERSION}-setup initdb || true
+        fi
+        POSTGRES_SERVICE="postgresql-${POSTGRES_VERSION}"
+    else
+        print_error "Unsupported package manager. Please install PostgreSQL manually."
+        exit 1
     fi
     
     # Start and enable PostgreSQL
-    systemctl start postgresql
-    systemctl enable postgresql
+    systemctl enable --now "$POSTGRES_SERVICE"
     
-    print_info "PostgreSQL installed and started"
+    print_info "PostgreSQL installed and started (service: $POSTGRES_SERVICE)"
 }
 
 create_user() {
@@ -182,17 +198,34 @@ create_user() {
 setup_database() {
     print_step "Setting up AdminiMail database"
     
-    # Generate random password
-    DB_PASSWORD=$(openssl rand -base64 32)
+    # Generate random password if not already set
+    DB_PASSWORD=${DB_PASSWORD:-$(openssl rand -base64 32)}
     
-    # Create database and user
-    sudo -u postgres psql -c "CREATE DATABASE adminimail;"
-    sudo -u postgres psql -c "CREATE USER admini WITH ENCRYPTED PASSWORD '$DB_PASSWORD';"
-    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE adminimail TO admini;"
-    sudo -u postgres psql -c "ALTER USER admini CREATEDB;"
+    # Create database and user idempotently
+    if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='adminimail'" | grep -q 1; then
+        sudo -u postgres psql -c "CREATE DATABASE adminimail;"
+        print_info "Database created: adminimail"
+    else
+        print_info "Database already exists: adminimail"
+    fi
     
-    # Save database configuration
-    cat > "$ADMINI_HOME/.env" <<EOF
+    if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='admini'" | grep -q 1; then
+        sudo -u postgres psql -c "CREATE USER admini WITH ENCRYPTED PASSWORD '$DB_PASSWORD';"
+        print_info "Database user created: admini"
+    else
+        print_info "Database user already exists: admini"
+        # Optionally update password if DB_PASSWORD provided
+        if [[ -n "${DB_PASSWORD}" ]]; then
+            sudo -u postgres psql -c "ALTER USER admini WITH ENCRYPTED PASSWORD '$DB_PASSWORD';" || true
+        fi
+    fi
+    
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE adminimail TO admini;" || true
+    sudo -u postgres psql -c "ALTER USER admini CREATEDB;" || true
+    
+    # Save database configuration (do not overwrite existing .env)
+    if [[ ! -f "$ADMINI_HOME/.env" ]]; then
+        cat > "$ADMINI_HOME/.env" <<EOF
 # AdminiMail Configuration
 DATABASE_URL="postgresql://admini:$DB_PASSWORD@localhost:5432/adminimail"
 ADMINI_HOSTNAME="$(hostname -f)"
@@ -218,13 +251,12 @@ ANTHROPIC_API_KEY=""
 ADMIN_EMAIL="admin@$(hostname -f)"
 ADMIN_PASSWORD="$(openssl rand -base64 16)"
 EOF
-    
-    chown "$ADMINI_USER:$ADMINI_USER" "$ADMINI_HOME/.env"
-    chmod 600 "$ADMINI_HOME/.env"
-    
-    print_info "Database created: adminimail"
-    print_info "Database user created: admini"
-    print_info "Configuration saved to: $ADMINI_HOME/.env"
+        chown "$ADMINI_USER:$ADMINI_USER" "$ADMINI_HOME/.env"
+        chmod 600 "$ADMINI_HOME/.env"
+        print_info "Configuration saved to: $ADMINI_HOME/.env"
+    else
+        print_warning "Config file exists at $ADMINI_HOME/.env. Skipping creation."
+    fi
 }
 
 install_adminimail() {
@@ -319,12 +351,15 @@ EOF
 setup_nginx() {
     print_step "Configuring Nginx reverse proxy"
     
-    # Create Nginx configuration
-    cat > "/etc/nginx/sites-available/adminimail" <<EOF
+    # Determine config path (Debian-style sites-available or conf.d)
+    if [[ -d "/etc/nginx/sites-available" ]]; then
+        local NGINX_CONF_PATH="/etc/nginx/sites-available/adminimail"
+        local NGINX_ENABLE_LINK="/etc/nginx/sites-enabled/adminimail"
+        cat > "$NGINX_CONF_PATH" <<'EOF'
 server {
     listen 80;
     server_name $(hostname -f);
-    return 301 https://\$server_name\$request_uri;
+    return 301 https://$server_name$request_uri;
 }
 
 server {
@@ -347,47 +382,106 @@ server {
 
     # AdminiMail webmail
     location / {
-        proxy_pass http://127.0.0.1:$WEBMAIL_PORT;
+        proxy_pass http://127.0.0.1:__WEBMAIL_PORT__;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_cache_bypass \$http_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
     }
 
     # API endpoints
     location /api/ {
-        proxy_pass http://127.0.0.1:$WEBMAIL_PORT;
+        proxy_pass http://127.0.0.1:__WEBMAIL_PORT__;
         proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
     # Health check
     location /health {
-        proxy_pass http://127.0.0.1:$WEBMAIL_PORT/health;
+        proxy_pass http://127.0.0.1:__WEBMAIL_PORT__/health;
         access_log off;
     }
 }
 EOF
+        # Substitute port placeholder safely
+        sed -i "s/__WEBMAIL_PORT__/$WEBMAIL_PORT/g" "$NGINX_CONF_PATH"
+        ln -sf "$NGINX_CONF_PATH" "$NGINX_ENABLE_LINK"
+        rm -f /etc/nginx/sites-enabled/default || true
+    else
+        local NGINX_CONF_PATH="/etc/nginx/conf.d/adminimail.conf"
+        cat > "$NGINX_CONF_PATH" <<'EOF'
+server {
+    listen 80;
+    server_name $(hostname -f);
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name $(hostname -f);
+
+    # SSL configuration (will be updated by certbot)
+    ssl_certificate /etc/ssl/certs/ssl-cert-snakeoil.pem;
+    ssl_certificate_key /etc/ssl/private/ssl-cert-snakeoil.key;
     
-    # Enable site
-    ln -sf /etc/nginx/sites-available/adminimail /etc/nginx/sites-enabled/
-    rm -f /etc/nginx/sites-enabled/default
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+    
+    # Security headers
+    add_header X-Frame-Options DENY;
+    add_header X-Content-Type-Options nosniff;
+    add_header X-XSS-Protection "1; mode=block";
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    # AdminiMail webmail
+    location / {
+        proxy_pass http://127.0.0.1:__WEBMAIL_PORT__;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # API endpoints
+    location /api/ {
+        proxy_pass http://127.0.0.1:__WEBMAIL_PORT__;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Health check
+    location /health {
+        proxy_pass http://127.0.0.1:__WEBMAIL_PORT__/health;
+        access_log off;
+    }
+}
+EOF
+        sed -i "s/__WEBMAIL_PORT__/$WEBMAIL_PORT/g" "$NGINX_CONF_PATH"
+    fi
     
     # Test configuration
     nginx -t
     
-    # Start Nginx
+    # Start/enable Nginx
     systemctl start nginx
     systemctl enable nginx
     
-    print_info "Nginx configured for AdminiMail"
+    print_info "Nginx configured for AdminiMail (config: $NGINX_CONF_PATH)"
 }
 
 setup_ssl() {
