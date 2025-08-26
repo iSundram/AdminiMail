@@ -237,7 +237,7 @@ install_adminimail() {
     else
         # Production installation from repository
         cd "$ADMINI_HOME"
-        git clone https://github.com/Admini-Tech/AdminiMail.git .
+        git clone https://github.com/iSundram/AdminiMail.git .
     fi
     
     # Install dependencies
