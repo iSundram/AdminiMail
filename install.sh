@@ -262,19 +262,32 @@ EOF
 install_adminimail() {
     print_step "Installing AdminiMail application"
     
-    # Clone or copy AdminiMail code
-    if [[ -d "/workspace" ]]; then
-        # Development installation
-        cp -r /workspace/* "$ADMINI_HOME/"
+    # Ensure installation directory exists and is owned by the service user
+    mkdir -p "$ADMINI_HOME"
+    chown -R "$ADMINI_USER:$ADMINI_USER" "$ADMINI_HOME"
+    
+    # Development installation: copy from workspace if present
+    if [[ -d "/workspace" && -n "$(ls -A /workspace 2>/dev/null)" ]]; then
+        print_info "Detected /workspace. Copying project files to $ADMINI_HOME"
+        rsync -a --delete --exclude node_modules --exclude .git /workspace/ "$ADMINI_HOME/"
     else
-        # Production installation from repository
-        cd "$ADMINI_HOME"
-        git clone https://github.com/iSundram/AdminiMail.git .
+        # Production installation
+        if [[ -d "$ADMINI_HOME/.git" ]]; then
+            print_info "Existing git repository found. Pulling latest changes."
+            sudo -u "$ADMINI_USER" git -C "$ADMINI_HOME" pull --ff-only || print_warning "Git pull failed; continuing with existing files."
+        else
+            if [[ -z "$(ls -A "$ADMINI_HOME" 2>/dev/null)" ]]; then
+                print_info "Cloning AdminiMail repository into empty directory."
+                sudo -u "$ADMINI_USER" git clone https://github.com/iSundram/AdminiMail.git "$ADMINI_HOME"
+            else
+                print_warning "$ADMINI_HOME is not empty and not a git repo. Skipping clone."
+            fi
+        fi
     fi
     
     # Install dependencies
     cd "$ADMINI_HOME"
-    sudo -u "$ADMINI_USER" pnpm install --frozen-lockfile
+    sudo -u "$ADMINI_USER" pnpm install --frozen-lockfile || sudo -u "$ADMINI_USER" pnpm install
     
     # Build application
     sudo -u "$ADMINI_USER" pnpm build
@@ -282,19 +295,23 @@ install_adminimail() {
     # Run database migrations
     sudo -u "$ADMINI_USER" pnpm db:migrate
     
-    # Generate DKIM keys
-    sudo -u "$ADMINI_USER" node -e "
-        const crypto = require('crypto');
-        const { generateKeyPairSync } = crypto;
-        const { privateKey, publicKey } = generateKeyPairSync('rsa', {
-            modulusLength: 2048,
-            publicKeyEncoding: { type: 'spki', format: 'pem' },
-            privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
-        });
-        require('fs').writeFileSync('$ADMINI_HOME/certs/dkim-private.pem', privateKey);
-        require('fs').writeFileSync('$ADMINI_HOME/certs/dkim-public.pem', publicKey);
-        console.log('DKIM keys generated');
-    "
+    # Generate DKIM keys if absent
+    if [[ ! -f "$ADMINI_HOME/certs/dkim-private.pem" || ! -f "$ADMINI_HOME/certs/dkim-public.pem" ]]; then
+        sudo -u "$ADMINI_USER" node -e "
+            const crypto = require('crypto');
+            const { generateKeyPairSync } = crypto;
+            const { privateKey, publicKey } = generateKeyPairSync('rsa', {
+                modulusLength: 2048,
+                publicKeyEncoding: { type: 'spki', format: 'pem' },
+                privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
+            });
+            require('fs').writeFileSync(process.env.ADMINI_HOME + '/certs/dkim-private.pem', privateKey);
+            require('fs').writeFileSync(process.env.ADMINI_HOME + '/certs/dkim-public.pem', publicKey);
+            console.log('DKIM keys generated');
+        "
+    else
+        print_info "DKIM keys already exist; skipping generation."
+    fi
     
     chown -R "$ADMINI_USER:$ADMINI_USER" "$ADMINI_HOME"
     
