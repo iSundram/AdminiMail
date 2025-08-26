@@ -23,6 +23,91 @@ POSTGRES_VERSION="15"
 ADMINI_NONINTERACTIVE="${ADMINI_NONINTERACTIVE:-1}"
 ADMINI_FORCE_OVERRIDE="${ADMINI_FORCE_OVERRIDE:-0}"
 
+set_env_var() {
+    local file="$1"
+    local key="$2"
+    local value="$3"
+    if grep -qE "^${key}=" "$file"; then
+        sed -i "s|^${key}=.*|${key}=\"${value}\"|" "$file"
+    else
+        echo "${key}=\"${value}\"" >> "$file"
+    fi
+}
+
+prompt_or_default() {
+    local prompt_msg="$1"
+    local default_val="$2"
+    local result
+    if [[ "$ADMINI_NONINTERACTIVE" == "1" ]]; then
+        result="$default_val"
+    else
+        read -r -p "$prompt_msg [$default_val]: " result
+        result="${result:-$default_val}"
+    fi
+    printf '%s' "$result"
+}
+
+ensure_env_file() {
+    local app_dir="$1"
+    local env_path="$app_dir/.env"
+    local example_path=""
+
+    if [[ -f "$env_path" ]]; then
+        print_info ".env already exists at $env_path"
+        return 0
+    fi
+
+    if [[ -f "$app_dir/.env.example" ]]; then
+        example_path="$app_dir/.env.example"
+    elif [[ -f "$app_dir/apps/server/.env.example" ]]; then
+        example_path="$app_dir/apps/server/.env.example"
+    elif [[ -f "$app_dir/packages/server/.env.example" ]]; then
+        example_path="$app_dir/packages/server/.env.example"
+    fi
+
+    if [[ -n "$example_path" ]]; then
+        print_info "Creating .env from $(basename "$example_path")"
+        cp "$example_path" "$env_path"
+        chown "$ADMINI_USER:$ADMINI_USER" "$env_path"
+        chmod 600 "$env_path"
+    else
+        print_warning ".env.example not found. Creating minimal .env"
+        touch "$env_path"
+        chown "$ADMINI_USER:$ADMINI_USER" "$env_path"
+        chmod 600 "$env_path"
+    fi
+
+    # Fill required variables if missing
+    local default_db_url="postgresql://admini:$(openssl rand -base64 12)@localhost:5432/adminimail"
+    local db_url
+    db_url=$(prompt_or_default "Enter DATABASE_URL" "$default_db_url")
+    set_env_var "$env_path" "DATABASE_URL" "$db_url"
+
+    local admin_email
+    admin_email=$(prompt_or_default "Enter ADMIN_EMAIL" "admin@$(hostname -f)")
+    set_env_var "$env_path" "ADMIN_EMAIL" "$admin_email"
+
+    local admin_password
+    admin_password=$(prompt_or_default "Enter ADMIN_PASSWORD" "$(openssl rand -base64 16)")
+    set_env_var "$env_path" "ADMIN_PASSWORD" "$admin_password"
+
+    # Secrets: only generate if absent or empty
+    if ! grep -qE '^JWT_SECRET=' "$env_path" || [[ -z "$(grep -E '^JWT_SECRET=' "$env_path" | cut -d'=' -f2)" ]]; then
+        set_env_var "$env_path" "JWT_SECRET" "$(openssl rand -base64 64)"
+    fi
+    if ! grep -qE '^ENCRYPTION_KEY=' "$env_path" || [[ -z "$(grep -E '^ENCRYPTION_KEY=' "$env_path" | cut -d'=' -f2)" ]]; then
+        set_env_var "$env_path" "ENCRYPTION_KEY" "$(openssl rand -base64 32)"
+    fi
+
+    # Ports defaults
+    set_env_var "$env_path" "ADMINI_SMTP_PORT" "$SMTP_PORT"
+    set_env_var "$env_path" "ADMINI_IMAP_PORT" "$IMAP_PORT"
+    set_env_var "$env_path" "ADMINI_POP3_PORT" "$POP3_PORT"
+    set_env_var "$env_path" "ADMINI_WEBMAIL_PORT" "$WEBMAIL_PORT"
+
+    print_info ".env initialized at $env_path"
+}
+
 # Default ports
 SMTP_PORT=25
 SMTP_SECURE_PORT=465
@@ -318,8 +403,7 @@ install_adminimail() {
             chown "$ADMINI_USER:$ADMINI_USER" "$ADMINI_HOME/.env"
             chmod 600 "$ADMINI_HOME/.env"
         else
-            print_warning ".env not found; creating configuration"
-            setup_database
+            ensure_env_file "$ADMINI_HOME"
         fi
     fi
     
