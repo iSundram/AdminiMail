@@ -1,12 +1,12 @@
 services:
-  zero:
+  adminimail:
     build:
       context: .
       dockerfile: docker/app/Dockerfile
     environment:
       NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-http://cf-worker.example}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-zerodotemail}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-adminimail}
       REDIS_URL: ${REDIS_URL}
       REDIS_TOKEN: ${REDIS_TOKEN:-upstash-local-token}
       RESEND_API_KEY: ${RESEND_API_KEY}
@@ -44,7 +44,7 @@ services:
       context: .
       dockerfile: docker/db/Dockerfile
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-zerodotemail}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-adminimail}
     depends_on:
       db:
         condition: service_healthy
@@ -57,12 +57,12 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-zerodotemail}
+      POSTGRES_DB: ${POSTGRES_DB:-adminimail}
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD', 'pg_isready', '-U', 'postgres', '-d', 'zerodotemail']
+      test: ['CMD', 'pg_isready', '-U', 'postgres', '-d', 'adminimail']
       interval: 10s
       timeout: 5s
       retries: 5

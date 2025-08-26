@@ -1,12 +1,12 @@
 services:
   db:
-    container_name: zerodotemail-db
+    container_name: adminimail-db
     image: postgres:17
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: zerodotemail
+      POSTGRES_DB: adminimail
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - 5432:5432
@@ -14,7 +14,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
 
   valkey:
-    container_name: zerodotemail-redis
+    container_name: adminimail-redis
     image: docker.io/bitnami/valkey:8.0
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
@@ -25,7 +25,7 @@ services:
       - valkey-data:/bitnami/valkey/data
 
   upstash-proxy:
-    container_name: zerodotemail-upstash-proxy
+    container_name: adminimail-upstash-proxy
     image: hiett/serverless-redis-http:latest
     environment:
       SRH_MODE: env
