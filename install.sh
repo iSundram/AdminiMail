@@ -267,6 +267,8 @@ install_adminimail() {
     mkdir -p "$ADMINI_HOME"
     chown -R "$ADMINI_USER:$ADMINI_USER" "$ADMINI_HOME"
     
+    BACKUP_DIR=""
+    
     # Development installation: copy from workspace if present
     if [[ -d "/workspace" && -n "$(ls -A /workspace 2>/dev/null)" ]]; then
         print_info "Detected /workspace. Copying project files to $ADMINI_HOME"
@@ -305,6 +307,19 @@ install_adminimail() {
                     fi
                 fi
             fi
+        fi
+    fi
+
+    # Ensure .env exists after possible clone/override
+    if [[ ! -f "$ADMINI_HOME/.env" ]]; then
+        if [[ -n "$BACKUP_DIR" && -f "$BACKUP_DIR/.env" ]]; then
+            print_info "Restoring .env from backup"
+            cp -f "$BACKUP_DIR/.env" "$ADMINI_HOME/.env"
+            chown "$ADMINI_USER:$ADMINI_USER" "$ADMINI_HOME/.env"
+            chmod 600 "$ADMINI_HOME/.env"
+        else
+            print_warning ".env not found; creating configuration"
+            setup_database
         fi
     fi
     
