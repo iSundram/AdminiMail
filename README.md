@@ -11,56 +11,130 @@ An Open-Source Gmail Alternative for the Future of Email
 
 ## What is AdminiMail?
 
-AdminiMail is an open-source AI email solution that gives users the power to **self-host** their own email app while also integrating external services like Gmail and other email providers. Our goal is to modernize and improve emails through AI agents to truly modernize emails.
+AdminiMail is a **complete, self-hosted email platform** that provides everything you need to run your own mail server with modern AI-powered features. Unlike traditional email services, AdminiMail gives you full control over your email infrastructure while providing enterprise-grade features and intelligent email management.
 
 ## Why AdminiMail?
 
-Most email services today are either **closed-source**, **data-hungry**, or **too complex to self-host**.
+Most email services today are either **closed-source**, **data-hungry**, or **require complex manual configuration**.
 AdminiMail is different:
 
-- ✅ **Open-Source** – No hidden agendas, fully transparent.
-- 🦾 **AI Driven** - Enhance your emails with Agents & LLMs.
-- 🔒 **Data Privacy First** – Your emails, your data. AdminiMail does not track, collect, or sell your data in any way. Please note: while we integrate with external services, the data passed through them is not under our control and falls under their respective privacy policies and terms of service.
-- ⚙️ **Self-Hosting Freedom** – Run your own email app with ease.
-- 📬 **Unified Inbox** – Connect multiple email providers like Gmail, Outlook, and more.
-- 🎨 **Customizable UI & Features** – Tailor your email experience the way you want it.
-- 🚀 **Developer-Friendly** – Built with extensibility and integrations in mind.
+- ✅ **Complete Self-Hosted Solution** – Native SMTP, IMAP, POP3 servers built in TypeScript
+- 🦾 **AI-Powered Intelligence** – Smart categorization, spam detection, and email insights
+- 🔒 **Total Privacy Control** – Your emails, your server, your data. No external dependencies
+- 🚀 **One-Click Installation** – Complete setup with a single script (`./install.sh`)
+- 🛡️ **Enterprise Security** – Argon2 authentication, 2FA, fail2ban, and comprehensive logging
+- 📱 **Modern Web Interface** – Beautiful, responsive webmail client built with React/Next.js
+- 🔧 **Full Admin Control** – Manage domains, users, aliases, and quotas through web interface
+- 📊 **Built-in Analytics** – Email statistics, delivery reports, and security monitoring
+## Core Features
+
+### 📧 **Complete Mail Server**
+- **Native SMTP Server** – Send and receive emails with full RFC compliance
+- **IMAP Server with IDLE** – Real-time email synchronization and folder management
+- **POP3 Support** – Legacy client compatibility
+- **SPF, DKIM, DMARC** – Automatic email authentication and security
+- **TLS/SSL Encryption** – Secure connections with Let's Encrypt integration
+
+### 🤖 **AI-Powered Features**
+- **Smart Categorization** – Automatically sort emails (Primary, Promotions, Updates, Spam)
+- **Spam & Phishing Detection** – Advanced ML-based filtering with Bayesian learning
+- **Email Summaries** – AI-generated summaries for long emails
+- **Reply Suggestions** – Intelligent response recommendations
+- **Link Safety Analysis** – Real-time phishing and malware link detection
+
+### 👨‍💼 **Administration & Management**
+- **Domain Management** – Add and verify multiple domains
+- **User Administration** – Create users, set quotas, manage permissions
+- **Alias Management** – Email forwarding and catch-all addresses
+- **DNS Record Generation** – Automatic SPF, DKIM, and DMARC record creation
+- **Security Monitoring** – Failed login tracking and IP blocking
+- **Backup & Migration** – Built-in backup tools and data export
+
+### 🌐 **Modern Web Interface**
+- **Responsive Design** – Works perfectly on desktop and mobile
+- **Real-time Updates** – WebSocket-based live email notifications
+- **Drag & Drop** – Easy file attachments and email organization
+- **Calendar Integration** – CalDAV support for scheduling
+- **Contact Management** – CardDAV-compatible address book
+- **Dark/Light Themes** – Customizable appearance
+## Quick Installation
+
+Get AdminiMail running on your server in minutes:
+
+```bash
+# Download and run the installer
+curl -fsSL https://install.admini.tech | sudo bash
+
+# Or clone and install manually
+git clone https://github.com/Admini-Tech/AdminiMail.git
+cd AdminiMail
+sudo ./install.sh
+```
+
+The installer will:
+- ✅ Install all dependencies (Node.js, PostgreSQL, Nginx)
+- ✅ Create database and system user
+- ✅ Configure mail servers (SMTP, IMAP, POP3)
+- ✅ Set up SSL certificates with Let's Encrypt
+- ✅ Configure firewall and security (fail2ban)
+- ✅ Generate DKIM keys and DNS records
+- ✅ Start all services and create admin account
+
+**System Requirements:**
+- Ubuntu 20.04+ or CentOS 8+ (64-bit)
+- 2GB+ RAM (4GB recommended)
+- 20GB+ storage
+- Root access
+- Domain name pointing to your server
 
 ## Tech Stack
 
-AdminiMail is built with modern and reliable technologies:
+AdminiMail is built with modern, enterprise-grade technologies:
 
-- **Frontend**: Next.js, React, TypeScript, TailwindCSS, Shadcn UI
-- **Backend**: Node.js, Drizzle ORM
-- **Database**: PostgreSQL
-- **Authentication**: Better Auth, Google OAuth
-<!-- - **Testing**: Jest, React Testing Library -->
+- **Frontend**: Next.js 14, React 18, TypeScript, TailwindCSS v4, Shadcn UI
+- **Backend**: Node.js 20+, Native TypeScript mail servers
+- **Database**: PostgreSQL 15+ with Drizzle ORM
+- **Mail Servers**: Custom SMTP, IMAP, POP3 implementations
+- **Security**: Argon2 password hashing, 2FA (TOTP/WebAuthn)
+- **AI**: OpenAI GPT-4, Anthropic Claude integration
+- **Protocols**: CalDAV (calendar), CardDAV (contacts)
+- **Monitoring**: Built-in logging, metrics, and alerting
+- **Deployment**: Single-script installation, systemd services
 
 ## Getting Started
 
-### Video Tutorial
+### Production Installation (Recommended)
 
-Watch this helpful video tutorial on how to set up AdminiMail locally:
+For production use, run the automated installer on your server:
 
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=yIXLQcjbeEM">
-    <img src="https://img.youtube.com/vi/yIXLQcjbeEM/0.jpg" alt="Zero Setup Tutorial" />
-  </a>
-</p>
+```bash
+# Quick install with default settings
+curl -fsSL https://install.admini.tech | sudo bash
 
-### Prerequisites
+# Or download and customize before running
+wget https://raw.githubusercontent.com/Admini-Tech/AdminiMail/main/install.sh
+chmod +x install.sh
+sudo ./install.sh
+```
 
-**Required Versions:**
+After installation:
+1. Access your AdminiMail server at `https://your-domain.com`
+2. Log in with the admin credentials shown during installation
+3. Configure your first domain and create email users
+4. Add DNS records for proper email delivery
 
-- [Node.js](https://nodejs.org/en/download) (v18 or higher)
-- [pnpm](https://pnpm.io) (v10 or higher)
-- [Docker](https://docs.docker.com/engine/install/) (v20 or higher)
+### Development Setup
 
-Before running the application, you'll need to set up services and configure environment variables. For more details on environment variables, see the [Environment Variables](#environment-variables) section.
+For development or testing, you can set up AdminiMail locally.
+
+**Prerequisites:**
+- [Node.js](https://nodejs.org/en/download) (v20 or higher)
+- [pnpm](https://pnpm.io) (v8 or higher)
+- [PostgreSQL](https://www.postgresql.org/) (v15 or higher)
 
 ### Setup Options
 
-You can set up AdminiMail in two ways:
+You can set up AdminiMail development environment in two ways:
 
 <details open>
 <summary><b>Standard Setup (Recommended)</b></summary>
